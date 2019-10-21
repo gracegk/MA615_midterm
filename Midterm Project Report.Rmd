@@ -1,0 +1,177 @@
+---
+title: "MA615 Midterm Project"
+author: "Gahyun (Grace) Kim"
+date: "10/21/2019"
+header-includes: 
+- \usepackage{float} # Latex 'float' package
+- \floatplacement{figure}{H} # make every figure with caption = h
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(wbstats)
+library(tidyverse)
+library(knitr)
+library(magrittr)
+library(esquisse)
+library(rattle)
+library(corrplot)
+library(cluster)
+library(factoextra)
+library(FactoMineR)
+
+load("/Users/home/Documents/MSSP Fall 2019/MA615/MA615_midterm/Clean_WB_data.RData")
+```
+
+## Introduction
+
+This report attempts to examine the possible relationships between variables in the World Bank Data from R. The World Bank Data contains records collected from 1960 to 2018 for various characteristics of a plethora of countries. The variables examined in this report are the following: GDP, life expectancy, infant mortality, urban population growth by percentage, urban population, nitrous oxide emission, carbon dioxide emission, number of nurses and midwives per 1000 people, number of physicians per 1000 people, and mortality for ages under 5 measured per 1000 people. The countries that were selected for analysis were the United States, Mexico, Sweden, Ghana, Republic of Korea, Philippines, Australia, and Russia. 
+
+## Data Set
+
+To display the data set in a more intuitive manner, the iso2c country codes were removed. The regions for each country were also removed because this paper focuses on individual countries, not regional differences. The country names and variables examined are displayed in the following lines of code. An example of one of the observations is also shown below. 
+
+```{r}
+unique(data$country)
+names(data)
+head(data, 1)
+```
+
+## Correlation Plot
+
+Correlation plots graphically display a correlation matrix with the variables used. The following correlation plot represents the correlation between different pairs of variables by color. Variables that are positively correlated are displayed in blue, and variables that are negatively correlated are displayed in red. The intensity of the color is proportional to the absolute value of the correlation coefficient. 
+
+```{r, echo=FALSE, fig.cap=paste("Correlation plot for selected variables in World Bank Data")}
+data_scaled <- scale(data[-1])
+
+data_corr <- cor(data_scaled)
+colnames(data_corr) <- c("Date", "CO2 Emission", "GDP", "Infant Mortality", "Life Expectancy", 
+                         "N2O Emission", "Nurses/Midwives per 1000", "Physicians per 1000", 
+                         "Under 5 Mortality per 1000", "Urban Population", 
+                         "Urban Population Growth %")
+rownames(data_corr) <- c("Date", "CO2 Emission", "GDP", "Infant Mortality", "Life Expectancy", 
+                         "N2O Emission", "Nurses/Midwives per 1000", "Physicians per 1000", 
+                         "Under 5 Mortality per 1000", "Urban Population", 
+                         "Urban Population Growth %")
+corrplot(data_corr, method = "color")
+```
+
+According to this correlation plot, there are a few pairs of variables that exhibit a strong correlation. Pairs with visibly strong positive correlations are infant mortality vs. under 5 mortality per 1000 and nitrous oxide emission vs. urban population. Variable pairs with visibly strong negative correlations are infant mortality vs. life expectancy, life expectancy vs. under 5 mortality per 1000, and infant mortality vs. physicians per 1000. 
+
+## Scree Plot
+
+The scree plot in this report displays the number of data clusters against the sum of squares within each group. The "elbow" in the line, the point where the graph seems to level off, represents that factors to the left of that point should be retained as significant. Because this scree plot lacks a clear "elbow" where the graph begins to level off, a cluster analysis is performed to further investigate how to divide the data. 
+
+```{r, echo = FALSE, fig.align='left', fig.cap=paste("Scree plot for World Bank Data")}
+wssplot <- function(data, nc = 15, seed = 1234){
+  wss <- nrow((data)-1)*sum(apply(data, 2, var))
+  for (i in 2:nc){
+    set.seed(seed)
+    wss[i] <- sum(kmeans(data, centers = i)$withinss)}
+  plot(1:nc, wss, type = "b", xlab = "Number of Clusters", 
+       ylab = "Within groups sum of squares")}
+
+wssplot(data_scaled, nc = 6)
+```
+
+## Cluster Analysis
+
+Cluster analysis is the process of determining which data points can be grouped into how many clusters. Clusters are small collections of data points that are similar to each other within the same cluster. Data in one cluster is not similar to data in another. Through cluster analysis, one can understand how to divide large amounts of data for exploratory analysis and discover latent variables. 
+
+```{r, echo = FALSE, fig.cap=paste("Cluster dendogram for World Bank Data")}
+# hierarchical clustering via euclidean distance
+d <- dist(data_scaled, method = "euclidean")
+
+H.fit <- hclust(d, method = "ward")
+plot(H.fit)
+
+groups <- cutree(H.fit, k = 3)
+
+rect.hclust(H.fit, k = 3, border = "red")
+```
+
+Cluster dendograms are the main tools used for visually representing a cluster solution for hierarchical clustering methods. Each line on the very bottom of the dendogram represents an observation from the data. 
+
+```{r, echo = FALSE}
+# ct <- table(data[,1], groups)
+# ct
+# 
+# perc_correct <- sum(diag(ct))/sum(ct)
+# perc_correct
+```
+
+```{r, echo = FALSE, fig.cap=paste("2D cluster plot for World Bank Data")}
+scdata_3 <- kmeans(data_scaled, 3)
+clusplot(data_scaled, scdata_3$cluster, 
+         main = '2D plot of Clusters: 3 clusters', 
+         color = TRUE, shade = TRUE, 
+         labels = 2, lines = 0)
+
+# set.seed(1234)
+# scdata_4 <- kmeans(data_scaled, 4)
+# clusplot(data_scaled, scdata_4$cluster, 
+#          main = '2D plot of Clusters: 4 clusters', 
+#          color = TRUE, shade = TRUE, 
+#          labels = 2, lines = 0)
+```
+
+This 2D plot of clusters displays which observations would be clustered together if we were to group the given data set into 3 clusters. 
+
+```{r, echo = FALSE, fig.cap=paste("Optimal number of clusters for World Bank Data")}
+res.dist <- get_dist(data_scaled, stand = TRUE, method = "pearson")
+fviz_nbclust(data_scaled, kmeans, method = "gap_stat")
+```
+
+The following plot represents how many clusters are optimal for the given data set by plotting the number of clusters against the k-means gap statistic. As the dendogram demonstrated above, the optimal number of clusters for this data set is three. 
+
+## Exploratory Data Analysis for Variables
+
+To visualize the variable pairs that seemed to be correlated according to the correlation plot, scatterplots with each pair were made. 
+
+```{r, echo = FALSE}
+# positively correlated variables
+ggplot(data, aes(x = infant_mortality, y = under5_mortality_per_1000)) + 
+  geom_point(aes(color = country)) + 
+  stat_smooth(geom="line", alpha=0.3, size=0.3) + 
+  labs(x = "Infant Mortality", y = "Under 5 Mortality per 1000")
+```
+
+The first scatterplot displays infant mortality plotted against under 5 mortality per 1000. Because the two variables measure nearly the same quality, a strong positive correlation was observed in this scatterplot. 
+
+```{r, echo = FALSE}
+# negatively correlated variables
+ggplot(data, aes(x = infant_mortality, y = life_expectancy)) + 
+  geom_point(aes(color = country)) + 
+  stat_smooth(geom="line", alpha=0.3, size=0.3) + 
+  labs(x = "Infant Mortality", y = "Life Expectancy")
+```
+
+The second scatterplot displays infant mortality plotted against life expectancy. As expected, countries with higher life expectancy have lower infant mortality and vice versa. However, unlike the infant mortality vs. under 5 mortality per 1000 plot above, there are some outliers that make the best fit line deviate from linear behavior. 
+
+```{r, echo = FALSE}
+ggplot(data, aes(x = life_expectancy, y = under5_mortality_per_1000)) + 
+  geom_point(aes(color = country)) + 
+  stat_smooth(geom="line", alpha=0.3, size=0.3) + 
+  labs(x = "Life Expectancy", y = "Under 5 Mortality per 1000")
+```
+
+The third scatterplot displays life expectancy plotted against under 5 mortality per 1000. There is an overall negative correlation according to the plot. This plot seems to exhibit a trend that is generally similar to the second plot because under 5 mortality per 1000 and infant mortality are similar qualities, as shown in the first plot. 
+
+```{r, echo = FALSE}
+ggplot(data, aes(x = infant_mortality, y = physicians_per_1000)) + 
+  geom_point(aes(color = country)) + 
+  stat_smooth(geom="line", alpha=0.3, size=0.3) + 
+  labs(x = "Infant Mortality", y = "Physicians per 1000")
+```
+
+The final scatterplot shows infant mortality plotted against the number of physicians per 1000 people. Based on this plot, we can deduce that having more physicians may lower infant mortality across nations. 
+
+## Conclusion
+
+This project examined 12 variables from the World Bank Data. The countries chosen were the United States, Mexico, Sweden, Ghana, Republic of Korea, Philippines, Australia, and Russia. The variables chosen were GDP, life expectancy, infant mortality, urban population growth by percentage, urban population, nitrous oxide emission, carbon dioxide emission, number of nurses and midwives per 1000 people, number of physicians per 1000 people, and mortality for ages under 5 measured per 1000 people.
+
+When the variables were plotted against each other in a correlation plot, it was observed that there were five pairs of variables that had a visibly strong positive or negative correlation. A cluster analysis was performed to see how the data could be divided into groups for analysis. When hierarchical clustering was performed via euclidean distance, it was found that grouping the data into three clusters would be appropriate. Using three as the optimal number of clusters was confirmed when the number of clusters was plotted against the k-means gap statistic. 
+
+When four variable pairs from the correlation plot were visualized as scatterplots, the correlations between some variables looked clearer. Upon comparing infant mortality and under 5 mortality per 1000, it is evident in the plots that the two measurements determine similar qualities. A plot with the two variables displays a strong positive correlation, and plots with life expectancy plotted against the two variables have similar negative correlations. Another insightful scatterplot was the plot with infant mortality and the number of physicians per 1000. This scatterplot showed that countries with more physicians have a higher chance of having lower infant mortality rates. 
