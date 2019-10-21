@@ -1,0 +1,152 @@
+---
+title: "Midterm Project Slides"
+author: "Gahyun (Grace) Kim"
+date: "10/21/2019"
+output: ioslides_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+library(wbstats)
+library(tidyverse)
+library(knitr)
+library(magrittr)
+library(esquisse)
+library(rattle)
+library(corrplot)
+library(cluster)
+library(factoextra)
+library(FactoMineR)
+
+load("/Users/home/Documents/MSSP Fall 2019/MA615/MA615_midterm/Clean_WB_data.RData")
+```
+
+## Intro
+
+World Bank Data from R
+
+- 1960 - 2018 records from countries worldwide
+- GDP, life expectancy, urban population, etc. 
+
+## Cleaned Data
+
+Countries: 
+```{r}
+unique(data$country)
+```
+
+Variables: 
+```{r}
+names(data)
+```
+
+NAs were removed for most of analysis. 
+
+## Correlation Plot
+
+```{r}
+data_scaled <- scale(data[-1])
+
+data_corr <- cor(data_scaled)
+colnames(data_corr) <- c("Date", "CO2 Emission", "GDP", "Infant Mortality", "Life Expectancy", 
+                         "N2O Emission", "Nurses/Midwives per 1000", "Physicians per 1000", 
+                         "Under 5 Mortality per 1000", "Urban Population", 
+                         "Urban Population Growth %")
+rownames(data_corr) <- c("Date", "CO2 Emission", "GDP", "Infant Mortality", "Life Expectancy", 
+                         "N2O Emission", "Nurses/Midwives per 1000", "Physicians per 1000", 
+                         "Under 5 Mortality per 1000", "Urban Population", 
+                         "Urban Population Growth %")
+corrplot(data_corr, method = "color")
+```
+
+## Scree Plot
+
+```{r, echo = FALSE}
+wssplot <- function(data, nc = 15, seed = 1234){
+  wss <- nrow((data)-1)*sum(apply(data, 2, var))
+  for (i in 2:nc){
+    set.seed(seed)
+    wss[i] <- sum(kmeans(data, centers = i)$withinss)}
+  plot(1:nc, wss, type = "b", xlab = "Number of Clusters", 
+       ylab = "Within groups sum of squares")}
+
+wssplot(data_scaled, nc = 6)
+```
+
+## Cluster Analysis
+
+```{r, echo = FALSE}
+# hierarchical clustering via euclidean distance
+d <- dist(data_scaled, method = "euclidean")
+
+H.fit <- hclust(d, method = "ward")
+plot(H.fit)
+
+groups <- cutree(H.fit, k = 3)
+
+rect.hclust(H.fit, k = 3, border = "red")
+```
+
+## Cluster Analysis
+
+```{r, echo = FALSE}
+res.dist <- get_dist(data_scaled, stand = TRUE, method = "pearson")
+fviz_nbclust(data_scaled, kmeans, method = "gap_stat")
+```
+
+## Cluster Analysis
+
+```{r, echo = FALSE}
+scdata_3 <- kmeans(data_scaled, 3)
+clusplot(data_scaled, scdata_3$cluster, 
+         main = '2D plot of Clusters: 3 clusters', 
+         color = TRUE, shade = TRUE, 
+         labels = 2, lines = 0)
+```
+
+## EDA for Variables
+
+Positively correlated variable pair 
+
+```{r, echo = FALSE}
+ggplot(data, aes(x = infant_mortality, y = under5_mortality_per_1000)) + 
+  geom_point(aes(color = country)) + 
+  stat_smooth(geom="line", alpha=0.3, size=0.3) + 
+  labs(x = "Infant Mortality", y = "Under 5 Mortality per 1000")
+
+```
+
+## EDA for Variables
+
+Negatively correlated variable pair 
+
+```{r}
+# negatively correlated variables
+ggplot(data, aes(x = infant_mortality, y = life_expectancy)) + 
+  geom_point(aes(color = country)) + 
+  stat_smooth(geom="line", alpha=0.3, size=0.3) + 
+  labs(x = "Infant Mortality", y = "Life Expectancy")
+```
+
+## EDA for Variables
+
+Negatively correlated variable pair 
+
+```{r}
+ggplot(data, aes(x = life_expectancy, y = under5_mortality_per_1000)) + 
+  geom_point(aes(color = country)) + 
+  stat_smooth(geom="line", alpha=0.3, size=0.3) + 
+  labs(x = "Life Expectancy", y = "Under 5 Mortality per 1000")
+```
+
+## EDA for Variables
+
+Negatively correlated variable pair 
+
+```{r}
+ggplot(data, aes(x = infant_mortality, y = physicians_per_1000)) + 
+  geom_point(aes(color = country)) + 
+  stat_smooth(geom="line", alpha=0.3, size=0.3) + 
+  labs(x = "Infant Mortality", y = "Physicians per 1000")
+```
